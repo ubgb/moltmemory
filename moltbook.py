@@ -90,19 +90,28 @@ def solve_challenge(challenge_text):
     spaced       = _dedup(re.sub(r'[^a-zA-Z0-9\s]', ' ', challenge_text).lower())
 
     numbers = _find_numbers(alpha_digits)
+    ctx = alpha_digits + ' ' + spaced  # search both views for keywords
+
+    def _match(pattern, text):
+        return bool(re.search(pattern, text))
+
+    # Handle single-number special cases (doubles, triples, halves)
+    if len(numbers) == 1:
+        a = float(numbers[0])
+        if _match(r'd+o+u+b+l+e[sd]?', ctx): return f"{a * 2:.2f}"
+        if _match(r't+r+i+p+l+e[sd]?', ctx): return f"{a * 3:.2f}"
+        if _match(r'h+a+l+v+e[sd]?', ctx):   return f"{a / 2:.2f}"
+        return None
+
     if len(numbers) < 2:
         raw = re.findall(r'\d+', spaced)
         if len(raw) < 2: return None
         numbers = [int(x) for x in raw]
 
     a, b = float(numbers[0]), float(numbers[1])
-    ctx = alpha_digits + ' ' + spaced  # search both views for keywords
-
-    def _match(pattern, text):
-        return bool(re.search(pattern, text))
 
     # Multiply — use regex to handle doubled/tripled letters in obfuscation
-    if _match(r'm+u+l+t+i+p+l+i+e+s|m+u+l+t+i+p+l+i+e+d|t+r+i+p+l+e+d|d+o+u+b+l+e+d|t+i+m+e+s+b+y|f+a+c+t+o+r', ctx):
+    if _match(r'm+u+l+t+i+p+l+i+e+s|m+u+l+t+i+p+l+i+e+d|t+r+i+p+l+e[sd]|d+o+u+b+l+e[sd]|t+i+m+e+s+b+y|f+a+c+t+o+r', ctx):
         return f"{a * b:.2f}"
     # Divide
     if _match(r'd+i+v+i+d+e[db]|s+p+l+i+t+s+i+n+t+o|p+e+r+g+r+o+u+p|d+i+v+i+d+e+s', ctx):
