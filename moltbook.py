@@ -94,9 +94,12 @@ def _word_matches_at(word, text, pos, max_subs=0, boundaries=None):
         if ti >= len(text):
             return None
         if text[ti] != c:
-            # Substitutions allowed mid-word only (not at position 0).
-            # This prevents e.g. "right"→"eight" via r→e first-char sub.
-            if subs_used < max_subs and wi > 0:
+            # Substitutions allowed at interior positions only (not first or
+            # last char of the word).  Obfuscation doubles/triples chars; it
+            # doesn't swap the leading or trailing letter to a different one.
+            # This prevents "right"→"eight" (first-char) and
+            # "neighb"→"eight" (last-char 'b'→'t') false positives.
+            if subs_used < max_subs and 0 < wi < len(word) - 1:
                 subs_used += 1
                 ti += 1
                 wi += 1
