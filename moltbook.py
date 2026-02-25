@@ -65,7 +65,7 @@ _W2N = {
 }
 _SORTED_WORDS = sorted(_W2N.keys(), key=len, reverse=True)
 
-def _word_matches_at(word, text, pos, max_subs=0):
+def _word_matches_at(word, text, pos, max_subs=0, boundaries=None):
     """Match word against text[pos:], allowing each word-character to absorb
     one or more identical consecutive characters in the text.
 
@@ -78,8 +78,14 @@ def _word_matches_at(word, text, pos, max_subs=0):
     in 'three'), we consume ONLY the minimum (1 char) so the following word
     character still has text to match against.
 
+    For the LAST word character: consume greedily only if the full run lands
+    on a run boundary (same space-delimited token); otherwise consume exactly 1
+    to avoid bleeding into an adjacent word that starts with the same letter
+    (e.g. 'fifteen' + 'newtons' sharing an 'n' run in the alpha string).
+
     max_subs: allowed single-character substitutions (each consumes one text
     char and one word char without requiring a match).
+    boundaries: set of boundary positions from _find_numbers (optional).
     """
     wi, ti = 0, pos
     subs_used = 0
@@ -98,11 +104,15 @@ def _word_matches_at(word, text, pos, max_subs=0):
         run_end = ti
         while run_end < len(text) and text[run_end] == c:
             run_end += 1
-        # Last word char: consume only 1 to avoid bleeding into adjacent word.
+        # Last word char: consume full run only if that lands at a boundary
+        # (isolated token); otherwise consume exactly 1 to avoid overshoot.
         # Mid-word: if the NEXT word char is also 'c', consume only 1.
         # Otherwise: greedy — consume the full run (handles doubled obfuscation).
         if wi + 1 >= len(word):
-            ti += 1
+            if boundaries is not None and run_end in boundaries:
+                ti = run_end   # greedy — lands exactly at token boundary
+            else:
+                ti += 1        # conservative — 1 char only
         elif word[wi + 1] == c:
             ti += 1
         else:
@@ -157,13 +167,13 @@ def _find_numbers(text_lower):
         prev_is_tens = (raw and raw[-1][2] == pos and
                         raw[-1][0] in (20, 30, 40, 50, 60, 70, 80, 90))
         for word in _SORTED_WORDS:
-            end = _word_matches_at(word, ad, pos)
+            end = _word_matches_at(word, ad, pos, boundaries=boundaries)
             if end is not None and end > best_end:
                 # Accept if: at a run boundary, next char starts a number word,
                 # OR this is a units digit immediately following a tens value.
                 at_boundary = end in boundaries
                 next_is_num = any(
-                    _word_matches_at(w2, ad, end) is not None
+                    _word_matches_at(w2, ad, end, boundaries=boundaries) is not None
                     for w2 in _SORTED_WORDS
                 )
                 is_units_after_tens = prev_is_tens and _W2N.get(word, 0) in range(1, 10)
@@ -174,11 +184,11 @@ def _find_numbers(text_lower):
             for word in _SORTED_WORDS:
                 if len(word) < 5:
                     continue
-                end = _word_matches_at(word, ad, pos, max_subs=1)
+                end = _word_matches_at(word, ad, pos, max_subs=1, boundaries=boundaries)
                 if end is not None and end > best_end:
                     at_boundary = end in boundaries
                     next_is_num = any(
-                        _word_matches_at(w2, ad, end) is not None
+                        _word_matches_at(w2, ad, end, boundaries=boundaries) is not None
                         for w2 in _SORTED_WORDS
                     )
                     is_units_after_tens = prev_is_tens and _W2N.get(word, 0) in range(1, 10)
@@ -270,7 +280,7 @@ def solve_challenge(challenge_text):
     if _match(r'd+i+v+i+d+e[db]|s+p+l+i+t+s+i+n+t+o|p+e+r+g+r+o+u+p|d+i+v+i+d+e+s', ctx):
         return f"{a / b:.2f}" if b else "0.00"
     # Subtract
-    if _match(r's+l+o+w+s|l+o+s+e+s|m+i+n+u+s|r+e+d+u+c+e+s|d+e+c+r+e+a+s+e+s|d+r+o+p+s|r+e+m+o+v+e+s|s+u+b+t+r+a+c+t+s|f+e+w+e+r', ctx):
+    if _match(r's+l+o+w+s|l+o+s+e+s|m+i+n+u+s|r+e+d+u+c+e+s|d+e+c+r+e+a+s+e+s|d+r+o+p+s|r+e+m+o+v+e+s|s+u+b+t+r+a+c+t+s|f+e+w+e+r|d+e+c+e+l+e+r+a+t+e+s?', ctx):
         return f"{a - b:.2f}"
     # Add — use curated a+b (respects the 'by'-operand heuristic above)
     if _match(r'p+l+u+s|g+a+i+n+s|i+n+c+r+e+a+s+e+s|c+o+m+b+i+n+e+d|t+o+t+a+l|a+d+d+s|t+o+g+e+t+h+e+r|a+c+c+e+l+e+r+a+t+e+s', ctx):
