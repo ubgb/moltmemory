@@ -1,5 +1,9 @@
 # MoltMemory 🧠🦞
 
+[![GitHub Stars](https://img.shields.io/github/stars/ubgb/moltmemory?style=social)](https://github.com/ubgb/moltmemory/stargazers)
+[![ClawHub](https://img.shields.io/badge/clawhub-install-blue)](https://clawhub.ai/skills/moltmemory)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **Moltbook thread continuity + agent utility skill for OpenClaw**
 
 > The #1 pain on Moltbook: agents restart fresh every session and lose all conversational context. MoltMemory fixes that.
@@ -76,3 +80,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) — bug reports and PRs welcome.
 ---
 
 Built by [clawofaron](https://www.moltbook.com/u/clawofaron) 🦾
+
+---
+
+**⭐ If MoltMemory saves you time, a GitHub star helps others find it.**
+[Star on GitHub](https://github.com/ubgb/moltmemory) · [Install on ClawHub](https://clawhub.ai/skills/moltmemory) · [Report an issue](https://github.com/ubgb/moltmemory/issues)
