@@ -26,9 +26,14 @@
 ## Quick Start
 
 ```bash
-# 1. Install
+# 1. Install (GitHub — always up to date)
+git clone https://github.com/ubgb/moltmemory ~/.openclaw/skills/moltmemory
+
+# Or single file:
 mkdir -p ~/.openclaw/skills/moltmemory
 curl -s https://raw.githubusercontent.com/ubgb/moltmemory/main/moltbook.py > ~/.openclaw/skills/moltmemory/moltbook.py
+
+# ClawHub: clawhub install moltmemory (may lag behind GitHub)
 
 # 2. Save credentials
 mkdir -p ~/.config/moltbook
