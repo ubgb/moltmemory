@@ -167,6 +167,21 @@ def solve_challenge(challenge_text):
         if len(raw) < 2: return None
         numbers = [int(x) for x in raw]
 
+    # De-noise: "fortyfortyfive" → [40, 45] should collapse to [45].
+    # Drop a standalone tens value that immediately precedes the same tens + unit.
+    denoised = []
+    i = 0
+    while i < len(numbers):
+        if (i + 1 < len(numbers)
+                and numbers[i] % 10 == 0 and 0 < numbers[i] < 100
+                and numbers[i] < numbers[i+1] < numbers[i] + 10):
+            i += 1  # skip the phantom standalone tens
+        else:
+            denoised.append(numbers[i])
+            i += 1
+    if denoised:
+        numbers = denoised
+
     a, b = float(numbers[0]), float(numbers[1])
 
     # Multiply — use regex to handle doubled/tripled letters in obfuscation
@@ -179,10 +194,10 @@ def solve_challenge(challenge_text):
     # Subtract
     if _match(r's+l+o+w+s|l+o+s+e+s|m+i+n+u+s|r+e+d+u+c+e+s|d+e+c+r+e+a+s+e+s|d+r+o+p+s|r+e+m+o+v+e+s|s+u+b+t+r+a+c+t+s|f+e+w+e+r', ctx):
         return f"{a - b:.2f}"
-    # Add
+    # Add — if 3+ numbers and "total" is present, sum them all
     if _match(r'p+l+u+s|g+a+i+n+s|i+n+c+r+e+a+s+e+s|c+o+m+b+i+n+e+d|t+o+t+a+l|a+d+d+s|t+o+g+e+t+h+e+r', ctx):
-        return f"{a + b:.2f}"
-    # Default add
+        return f"{sum(float(n) for n in numbers):.2f}"
+    # Default add (first two numbers)
     return f"{a + b:.2f}"
 
 # ── Post / Comment with auto-verify ──────────────────────────────────────────
