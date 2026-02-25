@@ -49,29 +49,74 @@ _W2N = {
     'fourteen':14,'fifteen':15,'sixteen':16,'seventeen':17,'eighteen':18,
     'nineteen':19,'twenty':20,'thirty':30,'forty':40,'fifty':50,'sixty':60,
     'seventy':70,'eighty':80,'ninety':90,'hundred':100,'thousand':1000,
+    # Phonetic / obfuscated variants seen in real challenges
+    'twenny':20,'twnty':20,'fourty':40,
 }
-# Pattern that can match number words embedded in the joined string
-_NUM_PAT = re.compile(
-    r'(?:' + '|'.join(sorted(_W2N.keys(), key=len, reverse=True)) + r'|\d+)'
-)
+_SORTED_WORDS = sorted(_W2N.keys(), key=len, reverse=True)
 
-def _find_numbers(joined_lower):
-    """Extract numbers from a no-space joined string.
-    Only combine tens+units (e.g. twenty+five=25) if they are adjacent
-    in the string (no more than 3 chars between end of first and start of next).
+def _word_matches_at(word, text, pos):
+    """Match word against text[pos:], allowing each word-character to absorb
+    one or more identical consecutive characters in the text.
+
+    Handles both:
+    - Letter-doubling obfuscation:  'seeven' matches 'seven'
+    - Natural double letters:       'three' matches 'three' (not 'thre')
+
+    When the next word character is the same as the current one (e.g. 'e','e'
+    in 'three'), we consume ONLY the minimum (1 char) so the following word
+    character still has text to match against.
     """
-    matches = list(_NUM_PAT.finditer(joined_lower))
-    raw = [(m.group(0), m.start(), m.end()) for m in matches]
-    vals = [(_W2N[w] if w in _W2N else int(w), s, e) for w,s,e in raw]
+    wi, ti = 0, pos
+    while wi < len(word):
+        c = word[wi]
+        if ti >= len(text) or text[ti] != c:
+            return None
+        # Count consecutive same chars in text starting at ti
+        run_end = ti
+        while run_end < len(text) and text[run_end] == c:
+            run_end += 1
+        # If the NEXT word char is also 'c', consume only 1 so it still matches
+        if wi + 1 < len(word) and word[wi + 1] == c:
+            ti += 1
+        else:
+            ti = run_end   # greedy: consume the whole run
+        wi += 1
+    return ti  # position after the match
 
+def _find_numbers(text_lower):
+    """Extract number words (and bare digits) from lowercased text.
+    Returns a flat list of integer values, with adjacent tens+units combined
+    (e.g. [20, 3] → [23]).
+    """
+    raw = []   # list of (value, start_pos, end_pos)
+    pos = 0
+    while pos < len(text_lower):
+        best_val, best_end = None, pos
+        for word in _SORTED_WORDS:
+            end = _word_matches_at(word, text_lower, pos)
+            if end is not None and end > best_end:
+                best_val, best_end = _W2N[word], end
+        if best_val is not None:
+            raw.append((best_val, pos, best_end))
+            pos = best_end
+            continue
+        m = re.match(r'\d+', text_lower[pos:])
+        if m:
+            raw.append((int(m.group()), pos, pos + m.end()))
+            pos += m.end()
+            continue
+        pos += 1
+
+    # Combine tens+units (twenty+three → 23) ONLY when the two tokens are
+    # immediately adjacent in the stripped text (gap == 0), matching original
+    # behaviour that prevents "twenty meters … five" → 25.
     combined = []
     i = 0
-    while i < len(vals):
-        v, vs, ve = vals[i]
-        if i + 1 < len(vals):
-            nxt, ns, ne = vals[i+1]
-            gap = ns - ve  # chars between the two tokens
-            if gap == 0:   # only combine if literally adjacent (e.g. "twentyfive")
+    while i < len(raw):
+        v, vs, ve = raw[i]
+        if i + 1 < len(raw):
+            nxt, ns, ne = raw[i + 1]
+            if ns == ve:  # adjacent — no gap
                 if v in (20,30,40,50,60,70,80,90) and 1 <= nxt <= 9:
                     combined.append(v + nxt); i += 2; continue
                 if nxt == 100:
@@ -80,13 +125,16 @@ def _find_numbers(joined_lower):
     return combined
 
 def _dedup(s):
-    """Collapse runs of 3+ identical consecutive chars: 'multiiplliess' -> 'multiplies'"""
+    """Collapse runs of 3+ identical consecutive chars (for keyword/op detection).
+    NOT used for number-word extraction — _word_matches_at handles that."""
     return re.sub(r'(.)\1{2,}', r'\1', s)
 
 def solve_challenge(challenge_text):
     """Auto-solve Moltbook's obfuscated math CAPTCHA. Returns answer string e.g. '75.00'"""
-    # Build two views: joined (for number extraction) and spaced (for op detection)
-    alpha_digits = _dedup(re.sub(r'[^a-zA-Z0-9]', '', challenge_text).lower())
+    # Two views of the text:
+    # alpha_digits — all non-alphanumeric stripped, for number extraction
+    # spaced       — symbols replaced with spaces, for operation-keyword detection
+    alpha_digits = re.sub(r'[^a-zA-Z0-9]', '', challenge_text).lower()
     spaced       = _dedup(re.sub(r'[^a-zA-Z0-9\s]', ' ', challenge_text).lower())
 
     numbers = _find_numbers(alpha_digits)
