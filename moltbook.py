@@ -429,6 +429,92 @@ def mark_post_seen(state, post_id):
     seen.add(post_id)
     state["seen_post_ids"] = list(seen)
 
+# ── Reply Drafts ─────────────────────────────────────────────────────────────
+def get_thread_context(api_key, post_id, max_comments=10):
+    """Fetch a full thread (post + recent comments) ready for reply drafting."""
+    post_resp = api("GET", f"/posts/{post_id}", api_key=api_key)
+    post = post_resp.get("post", {})
+    c_resp = api("GET", f"/posts/{post_id}/comments?limit={max_comments}", api_key=api_key)
+    comments = sorted(c_resp.get("comments", []), key=lambda x: x.get("created_at", ""))
+    return {
+        "post_id":  post_id,
+        "title":    post.get("title", ""),
+        "content":  post.get("content", "")[:400],
+        "url":      f"https://moltbook.com/posts/{post_id}",
+        "comments": [
+            {
+                "author":     c.get("author", {}).get("name", "?"),
+                "content":    c.get("content", "")[:300],
+                "created_at": c.get("created_at", ""),
+                "id":         c.get("id", ""),
+            }
+            for c in comments[-max_comments:]
+        ],
+    }
+
+
+def get_reply_drafts(api_key, state):
+    """Return threads with new replies and full context for drafting responses.
+
+    For each engaged thread that has new activity since last check, returns:
+      - post title + URL
+      - new comments (the ones you haven't replied to yet)
+      - recent thread context (so the reply makes sense in conversation)
+
+    The calling agent reads this output and composes a reply using:
+      python3 moltbook.py comment <post_id> "<your reply>"
+    """
+    drafts = []
+    for post_id, info in state.get("engaged_threads", {}).items():
+        r = api("GET", f"/posts/{post_id}", api_key=api_key)
+        post = r.get("post", {})
+        current = post.get("comment_count", 0)
+        last    = info.get("last_seen_count", 0)
+        if current <= last:
+            continue
+
+        ctx        = get_thread_context(api_key, post_id)
+        new_count  = current - last
+        all_c      = ctx["comments"]
+        new_c      = all_c[-new_count:] if new_count <= len(all_c) else all_c
+        old_c      = all_c[:-len(new_c)] if len(new_c) < len(all_c) else []
+
+        drafts.append({
+            "post_id":        post_id,
+            "title":          ctx["title"],
+            "url":            ctx["url"],
+            "post_content":   ctx["content"],
+            "new_count":      new_count,
+            "new_comments":   new_c,
+            "thread_context": old_c[-3:],   # last 3 prior comments for context
+        })
+    return drafts
+
+
+def print_reply_drafts(drafts):
+    """Pretty-print reply drafts to stdout for agent review."""
+    if not drafts:
+        print("✅ No threads need replies right now.")
+        return
+    print(f"\n🔔 {len(drafts)} thread(s) need your attention\n")
+    for d in drafts:
+        print("═" * 62)
+        print(f"📌 \"{d['title']}\"")
+        print(f"   {d['url']}")
+        print(f"   {d['new_count']} new {'reply' if d['new_count'] == 1 else 'replies'}")
+        if d["thread_context"]:
+            print("\n📜 Recent context:")
+            for c in d["thread_context"]:
+                ts = c["created_at"][:16]
+                print(f"  [{ts}] @{c['author']}: {c['content'][:120]}")
+        print(f"\n💬 New:")
+        for c in d["new_comments"]:
+            ts = c["created_at"][:16]
+            print(f"  [{ts}] @{c['author']}: {c['content'][:200]}")
+        print(f"\n✏️   Reply: python3 moltbook.py comment {d['post_id']} \"<your reply>\"")
+    print("═" * 62)
+
+
 # ── Service Registry ──────────────────────────────────────────────────────────
 def register_service(api_key, service_name, description, price_usdc, delivery_endpoint):
     content = (f"## Service: {service_name}\n\n{description}\n\n"
@@ -443,12 +529,12 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="MoltMemory CLI")
     s = p.add_subparsers(dest="cmd")
     s.add_parser("heartbeat")
+    s.add_parser("reply-drafts")
     fp  = s.add_parser("feed");     fp.add_argument("--submolt", default=None)
     fnp = s.add_parser("feed-new"); fnp.add_argument("--submolt", default=None)
     fnp.add_argument("--min-upvotes", type=int, default=0)
     pp = s.add_parser("post"); pp.add_argument("submolt"); pp.add_argument("title"); pp.add_argument("content")
     cp = s.add_parser("comment"); cp.add_argument("post_id"); cp.add_argument("content")
-    # Quick solver test
     sp = s.add_parser("solve"); sp.add_argument("challenge")
     args = p.parse_args()
 
@@ -457,6 +543,10 @@ if __name__ == "__main__":
         r = heartbeat(creds["api_key"], state)
         print("🔔 Needs attention:" if r["needs_attention"] else "✅ Nothing new")
         for item in r["items"]: print(f"  {item}")
+    elif args.cmd == "reply-drafts":
+        creds = load_creds(); state = load_state()
+        drafts = get_reply_drafts(creds["api_key"], state)
+        print_reply_drafts(drafts)
     elif args.cmd == "feed":
         creds = load_creds()
         for post in get_curated_feed(creds["api_key"], submolt=args.submolt):
