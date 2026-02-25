@@ -110,50 +110,92 @@ def _find_numbers(text_lower):
     """Extract number words (and bare digits) from lowercased text.
     Returns a flat list of integer values, with adjacent tens+units combined
     (e.g. [20, 3] → [23]).
+
+    Builds the concatenated alpha string (alpha_digits view) but also tracks
+    which positions are "run boundaries" — ends of contiguous alpha runs in
+    the original text.  A number-word match is only accepted when it ends at
+    a run boundary OR the next character immediately begins another number word
+    (allowing compound numbers like "twentythree").  This prevents matching
+    "ten" inside "antenna".
     """
-    raw = []   # list of (value, start_pos, end_pos)
+    # Build alpha_digits + a set of boundary positions (positions in
+    # alpha_digits that immediately follow a contiguous alpha run).
+    alpha = []
+    boundaries = set()
+    in_run = False
+    for ch in text_lower:
+        if ch.isalpha():
+            alpha.append(ch)
+            in_run = True
+        elif ch.isdigit():
+            alpha.append(ch)
+            in_run = True
+        else:
+            if in_run:
+                boundaries.add(len(alpha))  # end of this run
+                in_run = False
+    if in_run:
+        boundaries.add(len(alpha))
+    ad = ''.join(alpha)
+
+    raw = []
     pos = 0
-    while pos < len(text_lower):
-        best_val, best_end = None, pos
-        for word in _SORTED_WORDS:
-            end = _word_matches_at(word, text_lower, pos)
-            if end is not None and end > best_end:
-                best_val, best_end = _W2N[word], end
-        # Fallback: allow 1 substitution for words ≥5 chars (handles swap
-        # obfuscation like fiftenn→fifteen without risking short-word collisions)
-        if best_val is None:
-            for word in _SORTED_WORDS:
-                if len(word) < 5:
-                    continue
-                end = _word_matches_at(word, text_lower, pos, max_subs=1)
-                if end is not None and end > best_end:
-                    best_val, best_end = _W2N[word], end
-        if best_val is not None:
-            raw.append((best_val, pos, best_end))
-            pos = best_end
-            continue
-        m = re.match(r'\d+', text_lower[pos:])
+    while pos < len(ad):
+        # Bare integer
+        m = re.match(r'\d+', ad[pos:])
         if m:
             raw.append((int(m.group()), pos, pos + m.end()))
             pos += m.end()
             continue
+
+        best_val, best_end = None, pos
+        for word in _SORTED_WORDS:
+            end = _word_matches_at(word, ad, pos)
+            if end is not None and end > best_end:
+                # Accept only if match ends at a run boundary OR next char is
+                # also a number word (compound: "twentythree")
+                at_boundary = end in boundaries
+                next_is_num = any(
+                    _word_matches_at(w2, ad, end) is not None
+                    for w2 in _SORTED_WORDS
+                )
+                if at_boundary or next_is_num:
+                    best_val, best_end = _W2N[word], end
+        # Substitution fallback for ≥5-char words (fiftenn → fifteen)
+        if best_val is None:
+            for word in _SORTED_WORDS:
+                if len(word) < 5:
+                    continue
+                end = _word_matches_at(word, ad, pos, max_subs=1)
+                if end is not None and end > best_end:
+                    at_boundary = end in boundaries
+                    next_is_num = any(
+                        _word_matches_at(w2, ad, end) is not None
+                        for w2 in _SORTED_WORDS
+                    )
+                    if at_boundary or next_is_num:
+                        best_val, best_end = _W2N[word], end
+        if best_val is not None:
+            raw.append((best_val, pos, best_end))
+            pos = best_end
+            continue
         pos += 1
 
-    # Combine tens+units (twenty+three → 23) ONLY when the two tokens are
-    # immediately adjacent in the stripped text (gap == 0), matching original
-    # behaviour that prevents "twenty meters … five" → 25.
+    # Combine adjacent tens+units: twenty+three → 23.
+    # Adjacent = no gap between end of one and start of next in alpha string.
     combined = []
     i = 0
     while i < len(raw):
         v, vs, ve = raw[i]
         if i + 1 < len(raw):
             nxt, ns, ne = raw[i + 1]
-            if ns == ve:  # adjacent — no gap
-                if v in (20,30,40,50,60,70,80,90) and 1 <= nxt <= 9:
+            if ns == ve:
+                if v in (20, 30, 40, 50, 60, 70, 80, 90) and 1 <= nxt <= 9:
                     combined.append(v + nxt); i += 2; continue
                 if nxt == 100:
                     combined.append(v * 100); i += 2; continue
-        combined.append(v); i += 1
+        combined.append(v)
+        i += 1
     return combined
 
 def _dedup(s):
@@ -169,7 +211,7 @@ def solve_challenge(challenge_text):
     alpha_digits = re.sub(r'[^a-zA-Z0-9]', '', challenge_text).lower()
     spaced       = _dedup(re.sub(r'[^a-zA-Z0-9\s]', ' ', challenge_text).lower())
 
-    numbers = _find_numbers(alpha_digits)
+    numbers = _find_numbers(challenge_text.lower())
     ctx = alpha_digits + ' ' + spaced  # search both views for keywords
 
     def _match(pattern, text):
@@ -213,7 +255,7 @@ def solve_challenge(challenge_text):
 
     # Multiply — use regex to handle doubled/tripled letters in obfuscation
     # Matches: multiply, multiplied, multiplies, multiplier, multiplying, etc.
-    if _match(r'm+u+l+t+i+p+l+[iy]|t+r+i+p+l+e[sd]?|d+o+u+b+l+e[sd]?|t+i+m+e+s+b+y|f+a+c+t+o+r', ctx):
+    if _match(r'm+u+l+t+i+p+l+[iy]|t+r+i+p+l+e[sd]?|d+o+u+b+l+e[sd]?|t+i+m+e+s|f+a+c+t+o+r', ctx):
         return f"{a * b:.2f}"
     # Divide
     if _match(r'd+i+v+i+d+e[db]|s+p+l+i+t+s+i+n+t+o|p+e+r+g+r+o+u+p|d+i+v+i+d+e+s', ctx):
