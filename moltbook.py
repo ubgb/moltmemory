@@ -98,11 +98,15 @@ def _word_matches_at(word, text, pos, max_subs=0):
         run_end = ti
         while run_end < len(text) and text[run_end] == c:
             run_end += 1
-        # If the NEXT word char is also 'c', consume only 1 so it still matches
-        if wi + 1 < len(word) and word[wi + 1] == c:
+        # Last word char: consume only 1 to avoid bleeding into adjacent word.
+        # Mid-word: if the NEXT word char is also 'c', consume only 1.
+        # Otherwise: greedy — consume the full run (handles doubled obfuscation).
+        if wi + 1 >= len(word):
+            ti += 1
+        elif word[wi + 1] == c:
             ti += 1
         else:
-            ti = run_end   # greedy: consume the whole run
+            ti = run_end
         wi += 1
     return ti  # position after the match
 
@@ -149,17 +153,21 @@ def _find_numbers(text_lower):
             continue
 
         best_val, best_end = None, pos
+        # Accept units (1-9) unconditionally when immediately following a tens
+        prev_is_tens = (raw and raw[-1][2] == pos and
+                        raw[-1][0] in (20, 30, 40, 50, 60, 70, 80, 90))
         for word in _SORTED_WORDS:
             end = _word_matches_at(word, ad, pos)
             if end is not None and end > best_end:
-                # Accept only if match ends at a run boundary OR next char is
-                # also a number word (compound: "twentythree")
+                # Accept if: at a run boundary, next char starts a number word,
+                # OR this is a units digit immediately following a tens value.
                 at_boundary = end in boundaries
                 next_is_num = any(
                     _word_matches_at(w2, ad, end) is not None
                     for w2 in _SORTED_WORDS
                 )
-                if at_boundary or next_is_num:
+                is_units_after_tens = prev_is_tens and _W2N.get(word, 0) in range(1, 10)
+                if at_boundary or next_is_num or is_units_after_tens:
                     best_val, best_end = _W2N[word], end
         # Substitution fallback for ≥5-char words (fiftenn → fifteen)
         if best_val is None:
@@ -173,7 +181,8 @@ def _find_numbers(text_lower):
                         _word_matches_at(w2, ad, end) is not None
                         for w2 in _SORTED_WORDS
                     )
-                    if at_boundary or next_is_num:
+                    is_units_after_tens = prev_is_tens and _W2N.get(word, 0) in range(1, 10)
+                    if at_boundary or next_is_num or is_units_after_tens:
                         best_val, best_end = _W2N[word], end
         if best_val is not None:
             raw.append((best_val, pos, best_end))
