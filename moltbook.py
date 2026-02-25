@@ -20,9 +20,20 @@ def load_creds():
     return json.loads(CREDS_FILE.read_text())
 
 def load_state():
+    defaults = {
+        "engaged_threads": {},
+        "bookmarks": [],
+        "last_home_check": None,
+        "seen_post_ids": [],      # feed cursor: posts already seen
+        "last_feed_check": None,  # ISO timestamp of last feed scan
+    }
     if not STATE_FILE.exists():
-        return {"engaged_threads": {}, "bookmarks": [], "last_home_check": None}
-    return json.loads(STATE_FILE.read_text())
+        return defaults
+    state = json.loads(STATE_FILE.read_text())
+    # Backfill new keys for existing state files
+    for k, v in defaults.items():
+        state.setdefault(k, v)
+    return state
 
 def save_state(state):
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -245,6 +256,15 @@ def heartbeat(api_key, state):
         result["needs_attention"] = True
         result["items"].append(f"🔔 '{t['title']}' — {t['new_comments']} new replies")
 
+    new_posts = get_new_feed_posts(api_key, state, min_upvotes=3, limit=5)
+    if new_posts:
+        result["needs_attention"] = True
+        for p in new_posts:
+            result["items"].append(
+                f"📰 [{p.get('upvotes',0)}↑] '{p.get('title','')}' "
+                f"by {p.get('author',{}).get('name','?')} — /posts/{p.get('id','')}"
+            )
+
     state["last_home_check"] = datetime.now(timezone.utc).isoformat()
     save_state(state)
     return result
@@ -256,6 +276,49 @@ def get_curated_feed(api_key, min_upvotes=5, limit=10, submolt=None):
     posts = api("GET", path, api_key=api_key).get("posts", [])
     return sorted([p for p in posts if p.get("upvotes",0) >= min_upvotes],
                   key=lambda x: x.get("upvotes",0), reverse=True)[:limit]
+
+# ── Feed Cursor (skip-what-you've-seen) ──────────────────────────────────────
+def get_new_feed_posts(api_key, state, min_upvotes=0, limit=25, submolt=None):
+    """Return feed posts not yet seen, updating the seen cursor in state.
+
+    Args:
+        api_key:      Moltbook API key
+        state:        loaded state dict (will be mutated; call save_state after)
+        min_upvotes:  filter — only return posts with at least this many upvotes
+        limit:        max posts to return (after filtering)
+        submolt:      optional submolt name to scope the feed
+
+    Returns:
+        list of new post dicts (empty if nothing new)
+    """
+    path = "/posts?sort=new&limit=50"
+    if submolt:
+        path += f"&submolt={submolt}"
+    posts = api("GET", path, api_key=api_key).get("posts", [])
+
+    seen = set(state.get("seen_post_ids", []))
+    new_posts = [p for p in posts
+                 if p.get("id") not in seen
+                 and p.get("upvotes", 0) >= min_upvotes]
+
+    # Update cursor: add all fetched post IDs (seen or not) so we don't re-surface them
+    seen.update(p.get("id") for p in posts if p.get("id"))
+    # Cap the seen set to the most recent 500 to avoid unbounded growth
+    if len(seen) > 500:
+        # Keep IDs from the freshest posts we fetched, drop oldest
+        all_ids = [p.get("id") for p in posts if p.get("id")]
+        keep = set(all_ids) | set(list(seen)[-400:])
+        seen = seen & keep
+    state["seen_post_ids"] = list(seen)
+    state["last_feed_check"] = datetime.now(timezone.utc).isoformat()
+
+    return new_posts[:limit]
+
+def mark_post_seen(state, post_id):
+    """Mark a single post as seen so it won't reappear in get_new_feed_posts."""
+    seen = set(state.get("seen_post_ids", []))
+    seen.add(post_id)
+    state["seen_post_ids"] = list(seen)
 
 # ── Service Registry ──────────────────────────────────────────────────────────
 def register_service(api_key, service_name, description, price_usdc, delivery_endpoint):
@@ -271,7 +334,9 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="MoltMemory CLI")
     s = p.add_subparsers(dest="cmd")
     s.add_parser("heartbeat")
-    fp = s.add_parser("feed"); fp.add_argument("--submolt", default=None)
+    fp  = s.add_parser("feed");     fp.add_argument("--submolt", default=None)
+    fnp = s.add_parser("feed-new"); fnp.add_argument("--submolt", default=None)
+    fnp.add_argument("--min-upvotes", type=int, default=0)
     pp = s.add_parser("post"); pp.add_argument("submolt"); pp.add_argument("title"); pp.add_argument("content")
     cp = s.add_parser("comment"); cp.add_argument("post_id"); cp.add_argument("content")
     # Quick solver test
@@ -286,6 +351,16 @@ if __name__ == "__main__":
     elif args.cmd == "feed":
         creds = load_creds()
         for post in get_curated_feed(creds["api_key"], submolt=args.submolt):
+            print(f"[{post.get('upvotes',0)}↑] {post.get('title','')} /posts/{post.get('id','')}")
+    elif args.cmd == "feed-new":
+        creds = load_creds(); state = load_state()
+        posts = get_new_feed_posts(creds["api_key"], state,
+                                   min_upvotes=args.min_upvotes,
+                                   submolt=args.submolt)
+        save_state(state)
+        if not posts:
+            print("✅ No new posts since last check")
+        for post in posts:
             print(f"[{post.get('upvotes',0)}↑] {post.get('title','')} /posts/{post.get('id','')}")
     elif args.cmd == "post":
         creds = load_creds()
