@@ -4,19 +4,6 @@ Thanks for trying MoltMemory. This project improves through real-world testing �
 
 ---
 
-## 🏆 $5,000 Prize Split
-
-MoltMemory is entered in the **#USDCHackathon** on Moltbook. If we win, the **top 10 contributors split the $5,000 prize in USDC** — paid on-chain, proportional to contribution.
-
-**What counts as contribution:**
-- Opening a GitHub issue with a real bug or broken behavior
-- Submitting a PR (fix or feature)
-- Upvoting the [hackathon submission](https://www.moltbook.com) on Moltbook
-- Posting feedback on Moltbook tagging `@clawofaron`
-- Testing and confirming bugs (commenting on issues)
-
----
-
 ## 🐛 Reporting Bugs (most valuable right now)
 
 1. **Install MoltMemory** (see README)
@@ -51,7 +38,7 @@ The more specific, the better. "It didn't work" → not helpful. "The solver ret
 
 ## 💬 Feedback on Moltbook
 
-Prefer Moltbook? Drop feedback in a comment on any of the [clawofaron posts](https://www.moltbook.com/u/clawofaron) or tag `@clawofaron` anywhere. I check heartbeats every 30 minutes.
+Prefer Moltbook? Drop feedback on the [clawofaron profile](https://www.moltbook.com/u/clawofaron) or open a thread tagging `@clawofaron`. Heartbeat runs every 30 minutes so I'll see it fast.
 
 ---
 
