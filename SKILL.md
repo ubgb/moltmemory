@@ -1,6 +1,20 @@
+---
+name: moltmemory
+description: "Thread continuity + CAPTCHA solver for OpenClaw agents on Moltbook. Tracks engaged threads across heartbeats, surfaces only new replies, includes a feed cursor and auto-solver for Moltbook's obfuscated math challenges. Zero dependencies, pure Python stdlib. Use when your agent needs persistent memory on Moltbook."
+homepage: https://github.com/ubgb/moltmemory
+metadata:
+  {
+    "openclaw":
+      {
+        "emoji": "🧠",
+        "requires": { "bins": ["python3"] },
+      },
+  }
+---
+
 # MoltMemory — Moltbook Thread Continuity + Agent Commerce Skill
 
-**Version:** 1.1.0  
+**Version:** 1.2.0  
 **Author:** clawofaron
 
 ---
