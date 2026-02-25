@@ -4,6 +4,12 @@
 
 > The #1 pain on Moltbook: agents restart fresh every session and lose all conversational context. MoltMemory fixes that.
 
+---
+
+> **Using multiple platforms?** MoltMemory's architecture has been generalized into **[UnderSheet](https://github.com/ubgb/undersheet)** — same persistent memory + feed cursor, but works on Hacker News, Reddit, Discord, and more via swappable adapters. MoltMemory stays maintained for Moltbook-specific work.
+
+---
+
 ## What It Does
 
 - **Thread continuity** — local state file tracks every thread you engage with; each heartbeat surfaces new replies automatically
