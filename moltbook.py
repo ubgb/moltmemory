@@ -65,22 +65,34 @@ _W2N = {
 }
 _SORTED_WORDS = sorted(_W2N.keys(), key=len, reverse=True)
 
-def _word_matches_at(word, text, pos):
+def _word_matches_at(word, text, pos, max_subs=0):
     """Match word against text[pos:], allowing each word-character to absorb
     one or more identical consecutive characters in the text.
 
-    Handles both:
+    Handles:
     - Letter-doubling obfuscation:  'seeven' matches 'seven'
     - Natural double letters:       'three' matches 'three' (not 'thre')
+    - Letter-swap obfuscation:      'fiftenn' matches 'fifteen' (max_subs=1)
 
     When the next word character is the same as the current one (e.g. 'e','e'
     in 'three'), we consume ONLY the minimum (1 char) so the following word
     character still has text to match against.
+
+    max_subs: allowed single-character substitutions (each consumes one text
+    char and one word char without requiring a match).
     """
     wi, ti = 0, pos
+    subs_used = 0
     while wi < len(word):
         c = word[wi]
-        if ti >= len(text) or text[ti] != c:
+        if ti >= len(text):
+            return None
+        if text[ti] != c:
+            if subs_used < max_subs:
+                subs_used += 1
+                ti += 1
+                wi += 1
+                continue
             return None
         # Count consecutive same chars in text starting at ti
         run_end = ti
@@ -107,6 +119,15 @@ def _find_numbers(text_lower):
             end = _word_matches_at(word, text_lower, pos)
             if end is not None and end > best_end:
                 best_val, best_end = _W2N[word], end
+        # Fallback: allow 1 substitution for words ≥5 chars (handles swap
+        # obfuscation like fiftenn→fifteen without risking short-word collisions)
+        if best_val is None:
+            for word in _SORTED_WORDS:
+                if len(word) < 5:
+                    continue
+                end = _word_matches_at(word, text_lower, pos, max_subs=1)
+                if end is not None and end > best_end:
+                    best_val, best_end = _W2N[word], end
         if best_val is not None:
             raw.append((best_val, pos, best_end))
             pos = best_end
@@ -182,7 +203,13 @@ def solve_challenge(challenge_text):
     if denoised:
         numbers = denoised
 
-    a, b = float(numbers[0]), float(numbers[1])
+    # When 3+ numbers appear, the first may be noise/context (e.g. "at TWENTY
+    # FIFTEEN ... accelerates by SEVEN" → operands are 15 and 7, not 20 and 15).
+    # Heuristic: for "by"-phrased operations with 3+ numbers, use the last two.
+    if len(numbers) >= 3 and _match(r'\bby\b', spaced):
+        a, b = float(numbers[-2]), float(numbers[-1])
+    else:
+        a, b = float(numbers[0]), float(numbers[1])
 
     # Multiply — use regex to handle doubled/tripled letters in obfuscation
     # Matches: multiply, multiplied, multiplies, multiplier, multiplying, etc.
@@ -194,10 +221,10 @@ def solve_challenge(challenge_text):
     # Subtract
     if _match(r's+l+o+w+s|l+o+s+e+s|m+i+n+u+s|r+e+d+u+c+e+s|d+e+c+r+e+a+s+e+s|d+r+o+p+s|r+e+m+o+v+e+s|s+u+b+t+r+a+c+t+s|f+e+w+e+r', ctx):
         return f"{a - b:.2f}"
-    # Add — if 3+ numbers and "total" is present, sum them all
-    if _match(r'p+l+u+s|g+a+i+n+s|i+n+c+r+e+a+s+e+s|c+o+m+b+i+n+e+d|t+o+t+a+l|a+d+d+s|t+o+g+e+t+h+e+r', ctx):
-        return f"{sum(float(n) for n in numbers):.2f}"
-    # Default add (first two numbers)
+    # Add — use curated a+b (respects the 'by'-operand heuristic above)
+    if _match(r'p+l+u+s|g+a+i+n+s|i+n+c+r+e+a+s+e+s|c+o+m+b+i+n+e+d|t+o+t+a+l|a+d+d+s|t+o+g+e+t+h+e+r|a+c+c+e+l+e+r+a+t+e+s', ctx):
+        return f"{a + b:.2f}"
+    # Default add
     return f"{a + b:.2f}"
 
 # ── Post / Comment with auto-verify ──────────────────────────────────────────
