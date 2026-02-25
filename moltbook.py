@@ -94,7 +94,9 @@ def _word_matches_at(word, text, pos, max_subs=0, boundaries=None):
         if ti >= len(text):
             return None
         if text[ti] != c:
-            if subs_used < max_subs:
+            # Substitutions allowed mid-word only (not at position 0).
+            # This prevents e.g. "right"→"eight" via r→e first-char sub.
+            if subs_used < max_subs and wi > 0:
                 subs_used += 1
                 ti += 1
                 wi += 1
