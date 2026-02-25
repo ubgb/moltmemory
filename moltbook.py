@@ -280,7 +280,7 @@ def solve_challenge(challenge_text):
     if _match(r'd+i+v+i+d+e[db]|s+p+l+i+t+s+i+n+t+o|p+e+r+g+r+o+u+p|d+i+v+i+d+e+s', ctx):
         return f"{a / b:.2f}" if b else "0.00"
     # Subtract
-    if _match(r's+l+o+w+s|l+o+s+e+s|m+i+n+u+s|r+e+d+u+c+e+s|d+e+c+r+e+a+s+e+s|d+r+o+p+s|r+e+m+o+v+e+s|s+u+b+t+r+a+c+t+s|f+e+w+e+r|d+e+c+e+l+e+r+a+t+e+s?', ctx):
+    if _match(r's+l+o+w+(?:s|i+n+g|e+d)?|l+o+s+e+s?|m+i+n+u+s|r+e+d+u+c+e+s?|d+e+c+r+e+a+s+e+s?|d+r+o+p+s?|r+e+m+o+v+e+s?|s+u+b+t+r+a+c+t+s?|f+e+w+e+r|d+e+c+e+l+e+r+a+t+e+s?', ctx):
         return f"{a - b:.2f}"
     # Add — use curated a+b (respects the 'by'-operand heuristic above)
     if _match(r'p+l+u+s|g+a+i+n+s|i+n+c+r+e+a+s+e+s|c+o+m+b+i+n+e+d|t+o+t+a+l|a+d+d+s|t+o+g+e+t+h+e+r|a+c+c+e+l+e+r+a+t+e+s', ctx):
