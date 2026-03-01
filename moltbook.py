@@ -71,11 +71,17 @@ def mark_replied(state, comment_id):
     state["replied_comment_ids"] = replied
 
 
-def check_for_updates(state):
+SKILL_DIR = Path(__file__).parent.resolve()
+AUTO_UPDATE = os.environ.get("MOLTMEMORY_AUTO_UPDATE", "0") == "1"
+
+
+def check_for_updates(state, auto_update=None):
     """
-    Check GitHub for a newer version tag. Only runs every 12h to avoid rate limiting.
-    Returns an update notice string if behind, None if current or check failed.
+    Check GitHub for a newer version. Only runs every 12h to avoid rate limiting.
+    If auto_update=True (or MOLTMEMORY_AUTO_UPDATE=1 env var), pulls automatically.
+    Returns a status string, or None if current or check failed.
     """
+    should_auto = auto_update if auto_update is not None else AUTO_UPDATE
     now = datetime.now(timezone.utc)
     last = state.get("last_version_check")
     if last:
@@ -93,13 +99,34 @@ def check_for_updates(state):
         state["last_version_check"] = now.isoformat()
         state["latest_known_version"] = latest
         if latest and latest != CURRENT_VERSION:
+            if should_auto:
+                return _auto_pull(latest)
             return (
                 f"🔄 Update available: v{CURRENT_VERSION} → v{latest} — "
-                f"run: git -C ~/.openclaw/skills/moltmemory pull"
+                f"run: git -C {SKILL_DIR} pull"
             )
     except Exception:
         pass  # non-fatal — version check never breaks heartbeat
     return None
+
+
+def _auto_pull(latest):
+    """Pull latest version from GitHub into the skill directory. Non-fatal."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(SKILL_DIR), "pull", "--ff-only"],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0:
+            return f"✅ Auto-updated: v{CURRENT_VERSION} → v{latest} (restart to apply)"
+        else:
+            return (
+                f"⚠️  Auto-update failed (git pull returned {result.returncode}) — "
+                f"run manually: git -C {SKILL_DIR} pull"
+            )
+    except Exception as e:
+        return f"⚠️  Auto-update failed ({e}) — run: git -C {SKILL_DIR} pull"
 
 # ── HTTP ──────────────────────────────────────────────────────────────────────
 def api(method, path, body=None, api_key=None):
