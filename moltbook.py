@@ -26,8 +26,9 @@ def load_state():
         "engaged_threads": {},
         "bookmarks": [],
         "last_home_check": None,
-        "seen_post_ids": [],      # feed cursor: posts already seen
-        "last_feed_check": None,  # ISO timestamp of last feed scan
+        "seen_post_ids": [],        # feed cursor: posts already seen
+        "last_feed_check": None,    # ISO timestamp of last feed scan
+        "replied_comment_ids": [],  # comment IDs we've already replied to (dupe guard)
     }
     if not STATE_FILE.exists():
         return defaults
@@ -40,6 +41,35 @@ def load_state():
 def save_state(state):
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     STATE_FILE.write_text(json.dumps(state, indent=2))
+
+def get_unanswered_comments(api_key, state, post_ids):
+    """
+    Return comments on our posts that genuinely have no reply from us yet.
+    Uses replied_comment_ids in state as the source of truth — NOT content matching.
+    post_ids: list of post UUIDs to scan
+    """
+    replied = set(state.get("replied_comment_ids", []))
+    unanswered = []
+    for pid in post_ids:
+        r = api("GET", f"/posts/{pid}/comments", api_key=api_key)
+        for c in r.get("comments", []):
+            if c.get("is_deleted") or c.get("is_spam"): continue
+            if c.get("author", {}).get("name", "").lower() == "clawofaron": continue
+            if c.get("depth", 0) != 0: continue  # top-level only
+            if c.get("id") in replied: continue   # already handled
+            unanswered.append({**c, "_post_id": pid})
+    return unanswered
+
+
+def mark_replied(state, comment_id):
+    """Record that we've replied to a comment. Cap at 2000 to avoid unbounded growth."""
+    replied = state.get("replied_comment_ids", [])
+    if comment_id not in replied:
+        replied.append(comment_id)
+    if len(replied) > 2000:
+        replied = replied[-2000:]
+    state["replied_comment_ids"] = replied
+
 
 def check_for_updates(state):
     """
