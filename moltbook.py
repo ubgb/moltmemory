@@ -10,7 +10,9 @@ from pathlib import Path
 import urllib.request, urllib.error
 
 # ── Config ────────────────────────────────────────────────────────────────────
-API_BASE   = "https://www.moltbook.com/api/v1"
+API_BASE        = "https://www.moltbook.com/api/v1"
+CURRENT_VERSION = "1.5.0"
+GITHUB_REPO     = "ubgb/moltmemory"
 STATE_FILE = Path(os.environ.get("MOLTMEMORY_STATE", "~/.config/moltbook/state.json")).expanduser()
 CREDS_FILE = Path("~/.config/moltbook/credentials.json").expanduser()
 
@@ -38,6 +40,36 @@ def load_state():
 def save_state(state):
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     STATE_FILE.write_text(json.dumps(state, indent=2))
+
+def check_for_updates(state):
+    """
+    Check GitHub for a newer version tag. Only runs every 12h to avoid rate limiting.
+    Returns an update notice string if behind, None if current or check failed.
+    """
+    now = datetime.now(timezone.utc)
+    last = state.get("last_version_check")
+    if last:
+        diff = (now - datetime.fromisoformat(last)).total_seconds()
+        if diff < 43200:  # 12 hours
+            return None
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+            headers={"User-Agent": f"moltmemory/{CURRENT_VERSION}"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as r:
+            data = json.load(r)
+        latest = data.get("tag_name", "").lstrip("v")
+        state["last_version_check"] = now.isoformat()
+        state["latest_known_version"] = latest
+        if latest and latest != CURRENT_VERSION:
+            return (
+                f"🔄 Update available: v{CURRENT_VERSION} → v{latest} — "
+                f"run: git -C ~/.openclaw/skills/moltmemory pull"
+            )
+    except Exception:
+        pass  # non-fatal — version check never breaks heartbeat
+    return None
 
 # ── HTTP ──────────────────────────────────────────────────────────────────────
 def api(method, path, body=None, api_key=None):
@@ -277,6 +309,11 @@ def solve_challenge(challenge_text):
     else:
         a, b = float(numbers[0]), float(numbers[1])
 
+    # Literal * operator in raw text (e.g. "fourteen * three")
+    # Only trigger on * with no / present — slash appears too often as "per/with" etc.
+    raw_stripped = re.sub(r'[a-zA-Z0-9\s]', '', challenge_text)
+    if '*' in raw_stripped and '/' not in raw_stripped:
+        return f"{a * b:.2f}"
     # Multiply — use regex to handle doubled/tripled letters in obfuscation
     # Matches: multiply, multiplied, multiplies, multiplier, multiplying, etc.
     if _match(r'm+u+l+t+i+p+l+[iy]|t+r+i+p+l+e[sd]?|d+o+u+b+l+e[sd]?|t+i+m+e+s|f+a+c+t+o+r', ctx):
@@ -342,6 +379,7 @@ def get_unread_threads(api_key, state):
 # ── Heartbeat ─────────────────────────────────────────────────────────────────
 def heartbeat(api_key, state):
     result = {"needs_attention": False, "items": []}
+    threads_tracked = len(state.get("engaged_threads", {}))
     home = api("GET", "/home", api_key=api_key)
     acct = home.get("your_account", {})
 
@@ -361,7 +399,8 @@ def heartbeat(api_key, state):
         result["needs_attention"] = True
         result["items"].append(f"📨 {dms} unread DMs")
 
-    for t in get_unread_threads(api_key, state):
+    unread_threads = get_unread_threads(api_key, state)
+    for t in unread_threads:
         result["needs_attention"] = True
         result["items"].append(f"🔔 '{t['title']}' — {t['new_comments']} new replies")
 
@@ -374,9 +413,55 @@ def heartbeat(api_key, state):
                 f"by {p.get('author',{}).get('name','?')} — /posts/{p.get('id','')}"
             )
 
-    state["last_home_check"] = datetime.now(timezone.utc).isoformat()
+    # ── Context restoration summary ──
+    new_thread_count = len(unread_threads)
+    if threads_tracked:
+        result["items"].insert(0,
+            f"🧠 Context restored: {threads_tracked} thread{'s' if threads_tracked != 1 else ''} tracked"
+            + (f", {new_thread_count} with new activity" if new_thread_count else ", none with new activity")
+        )
+    result["threads_tracked"] = threads_tracked
+    result["threads_with_new"] = new_thread_count
+
+    # ── Version check (every 12h — keeps agents on latest) ──
+    update_notice = check_for_updates(state)
+    if update_notice:
+        result["needs_attention"] = True
+        result["items"].insert(0, update_notice)
+
+    now_ts = datetime.now(timezone.utc).isoformat()
+    state["last_home_check"] = now_ts
     save_state(state)
+
+    # ── Write now.json for fast startup reads ──
+    try:
+        now_path = Path(STATE_FILE).parent / "now.json"
+        now_path.write_text(json.dumps({
+            "last_check": now_ts,
+            "threads_tracked": threads_tracked,
+            "threads_with_new": new_thread_count,
+            "unread_notifications": notifs,
+            "unread_dms": dms,
+        }, indent=2))
+    except Exception:
+        pass
+
     return result
+
+
+def lifeboat(state):
+    """Snapshot thread state to lifeboat.json — call before expected compaction."""
+    threads = state.get("engaged_threads", {})
+    lb = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "threads_tracked": len(threads),
+        "active_threads": threads,
+        "seen_post_count": len(state.get("seen_post_ids", [])),
+        "last_home_check": state.get("last_home_check"),
+    }
+    lb_path = Path(STATE_FILE).parent / "lifeboat.json"
+    lb_path.write_text(json.dumps(lb, indent=2))
+    return lb_path, lb
 
 # ── Feed ──────────────────────────────────────────────────────────────────────
 def get_curated_feed(api_key, min_upvotes=5, limit=10, submolt=None):
@@ -529,6 +614,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="MoltMemory CLI")
     s = p.add_subparsers(dest="cmd")
     s.add_parser("heartbeat")
+    s.add_parser("lifeboat")
     s.add_parser("reply-drafts")
     fp  = s.add_parser("feed");     fp.add_argument("--submolt", default=None)
     fnp = s.add_parser("feed-new"); fnp.add_argument("--submolt", default=None)
@@ -543,6 +629,12 @@ if __name__ == "__main__":
         r = heartbeat(creds["api_key"], state)
         print("🔔 Needs attention:" if r["needs_attention"] else "✅ Nothing new")
         for item in r["items"]: print(f"  {item}")
+    elif args.cmd == "lifeboat":
+        state = load_state()
+        lb_path, lb = lifeboat(state)
+        print(f"💾 Lifeboat saved → {lb_path}")
+        print(f"   {lb['threads_tracked']} threads, {lb['seen_post_count']} seen posts")
+        print(f"   Restore after compaction: python3 moltbook.py heartbeat")
     elif args.cmd == "reply-drafts":
         creds = load_creds(); state = load_state()
         drafts = get_reply_drafts(creds["api_key"], state)
