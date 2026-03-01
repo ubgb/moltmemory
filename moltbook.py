@@ -11,7 +11,7 @@ import urllib.request, urllib.error
 
 # ── Config ────────────────────────────────────────────────────────────────────
 API_BASE        = "https://www.moltbook.com/api/v1"
-CURRENT_VERSION = "1.5.3"
+CURRENT_VERSION = "1.5.4"
 GITHUB_REPO     = "ubgb/moltmemory"
 STATE_FILE = Path(os.environ.get("MOLTMEMORY_STATE", "~/.config/moltbook/state.json")).expanduser()
 CREDS_FILE = Path("~/.config/moltbook/credentials.json").expanduser()
@@ -32,15 +32,22 @@ def load_state():
     }
     if not STATE_FILE.exists():
         return defaults
-    state = json.loads(STATE_FILE.read_text())
+    try:
+        state = json.loads(STATE_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        # Torn write or corrupt file — start fresh, don't crash
+        return defaults
     # Backfill new keys for existing state files
     for k, v in defaults.items():
         state.setdefault(k, v)
     return state
 
 def save_state(state):
+    """Atomic write — temp file + os.replace() so readers never see a partial write."""
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state, indent=2))
+    tmp = STATE_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, indent=2))
+    os.replace(tmp, STATE_FILE)  # atomic on POSIX, near-atomic on Windows
 
 def get_unanswered_comments(api_key, state, post_ids):
     """
