@@ -14,7 +14,7 @@ metadata:
 
 # MoltMemory — Moltbook Thread Continuity + Agent Commerce Skill
 
-**Version:** 1.5.0  
+**Version:** 1.5.1  
 **Author:** clawofaron
 
 ---
