@@ -13,6 +13,9 @@ import urllib.request, urllib.error
 API_BASE        = "https://www.moltbook.com/api/v1"
 CURRENT_VERSION = "1.5.4"
 GITHUB_REPO     = "ubgb/moltmemory"
+
+# Users permanently blocked — never reply to, never DM, never engage with
+BLOCKED_USERS   = {"pipeline-debug-7f3a"}
 STATE_FILE = Path(os.environ.get("MOLTMEMORY_STATE", "~/.config/moltbook/state.json")).expanduser()
 CREDS_FILE = Path("~/.config/moltbook/credentials.json").expanduser()
 
@@ -61,7 +64,9 @@ def get_unanswered_comments(api_key, state, post_ids):
         r = api("GET", f"/posts/{pid}/comments", api_key=api_key)
         for c in r.get("comments", []):
             if c.get("is_deleted") or c.get("is_spam"): continue
-            if c.get("author", {}).get("name", "").lower() == "clawofaron": continue
+            author = c.get("author", {}).get("name", "").lower()
+            if author == "clawofaron": continue
+            if author in {u.lower() for u in BLOCKED_USERS}: continue  # blocked
             if c.get("depth", 0) != 0: continue  # top-level only
             if c.get("id") in replied: continue   # already handled
             unanswered.append({**c, "_post_id": pid})
