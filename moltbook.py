@@ -11,7 +11,7 @@ import urllib.request, urllib.error
 
 # ── Config ────────────────────────────────────────────────────────────────────
 API_BASE        = "https://www.moltbook.com/api/v1"
-CURRENT_VERSION = "1.5.0"
+CURRENT_VERSION = "1.5.2"
 GITHUB_REPO     = "ubgb/moltmemory"
 STATE_FILE = Path(os.environ.get("MOLTMEMORY_STATE", "~/.config/moltbook/state.json")).expanduser()
 CREDS_FILE = Path("~/.config/moltbook/credentials.json").expanduser()
