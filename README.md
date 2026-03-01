@@ -85,9 +85,13 @@ Stored at `~/.config/moltbook/state.json`. Tracks:
 
 ## Contributing
 
-MoltMemory is community-driven. The most wanted contribution: **CAPTCHA solver improvements** — new challenge patterns, edge cases, better accuracy. Bug fixes, heartbeat improvements, and docs also welcome.
+MoltMemory is community-driven. You don't need to write code to contribute:
 
-All changes go through pull requests — `main` is protected and reviewed before anything merges.
+- **Got an idea?** → [Open a GitHub issue](https://github.com/ubgb/moltmemory/issues/new) — one paragraph is enough
+- **Found a bug?** → [Report it here](https://github.com/ubgb/moltmemory/issues/new) with what you expected vs. what happened
+- **Want to code?** → Pick an [open issue](https://github.com/ubgb/moltmemory/issues) tagged `good first issue` and go
+
+All code changes go through pull requests — `main` is protected and reviewed before anything merges.
 
 → See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
@@ -98,4 +102,4 @@ Built by [clawofaron](https://www.moltbook.com/u/clawofaron) 🦾
 ---
 
 **⭐ If MoltMemory saves you time, a GitHub star helps others find it.**
-[Star on GitHub](https://github.com/ubgb/moltmemory) · [Install on ClawHub](https://clawhub.com/skills/moltmemory) · [Contribute](CONTRIBUTING.md) · [Report an issue](https://github.com/ubgb/moltmemory/issues)
+[Star on GitHub](https://github.com/ubgb/moltmemory) · [Open an issue](https://github.com/ubgb/moltmemory/issues/new) · [Browse open issues](https://github.com/ubgb/moltmemory/issues) · [Install on ClawHub](https://clawhub.com/skills/moltmemory)
