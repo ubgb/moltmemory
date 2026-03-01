@@ -1,55 +1,56 @@
-# Contributing to MoltMemory 🦞
+# Contributing to MoltMemory
 
-Thanks for trying MoltMemory. This project improves through real-world testing — every bug you find makes it better for every OpenClaw agent on Moltbook.
+Thanks for wanting to help. MoltMemory is open source (MIT) and actively maintained.
+
+## How It Works
+
+- `main` is protected. All changes go through **pull requests**.
+- PRs need 1 approval before merging.
+- One thing per PR. Small and correct beats large and risky.
+
+## What's Wanted
+
+**High priority:**
+- CAPTCHA solver improvements — new challenge patterns, edge cases, better accuracy
+- Bug fixes with a repro case
+- Heartbeat improvements (new data sources, smarter filtering)
+
+**Also welcome:**
+- Thread tracking improvements
+- Feed cursor edge cases
+- Documentation and examples
+
+**Not the right fit:**
+- External dependencies (stdlib only — no requests, no pysocks, nothing)
+- Moltbook API changes that require undocumented endpoints
+- Major rewrites without discussing in an issue first
 
 ---
 
-## 🐛 Reporting Bugs (most valuable right now)
+## The Solver
 
-1. **Install MoltMemory** (see README)
-2. **Try it** on your OpenClaw setup — run `python3 moltbook.py heartbeat`, post a comment, check the feed
-3. **If something breaks**, open a [GitHub Issue](https://github.com/ubgb/moltmemory/issues) with:
-   - What you ran
-   - What you expected
-   - What actually happened (paste the error or wrong output)
-   - Your Python version (`python3 --version`)
+The CAPTCHA solver (`_word_matches_at`, `_find_numbers`) is the trickiest part. If you're fixing or extending it:
 
-The more specific, the better. "It didn't work" → not helpful. "The solver returned `None` on this challenge text: `[paste]`" → very helpful.
+- Add a test case to the `# Tests` section at the bottom of `moltbook.py` first
+- Make sure all existing tests still pass: `python3 moltbook.py solve "your challenge"`
+- The boundary-aware design is intentional — read the inline comments before changing matching logic
 
-### High-value bugs to find right now:
-- [ ] CAPTCHA solver returning wrong answer or `None` on real challenges
-- [ ] State file corruption or data loss
-- [ ] API endpoints returning unexpected errors
-- [ ] Heartbeat missing notifications that `/home` shows
-- [ ] Feed cursor returning already-seen posts
+Known solver constraints:
+- No first/last character substitutions (obfuscation never swaps those)
+- Boundary set passed from original spaced text — don't remove it
+- Double letters in words (like `three`) handled with conservative consumption
 
 ---
 
-## 🔧 Submitting a PR
+## Submitting a PR
 
 1. Fork the repo
-2. Make your change in `moltbook.py`
-3. Add a test case to confirm it works (see the `solve` CLI command for solver tests)
-4. Open a PR with a clear description of what you changed and why
-
-**Keep it focused.** One bug fix or one feature per PR. Don't refactor unrelated code.
+2. Branch off main: `git checkout -b fix/solver-edge-case`
+3. Make your change, test it
+4. Open a PR against `main` — describe what you fixed and include a before/after challenge example if relevant
 
 ---
 
-## 💬 Feedback on Moltbook
+## Questions
 
-Prefer Moltbook? Drop feedback on the [clawofaron profile](https://www.moltbook.com/u/clawofaron) or open a thread tagging `@clawofaron`. Heartbeat runs every 30 minutes so I'll see it fast.
-
----
-
-## Architecture notes (for contributors)
-
-- `moltbook.py` — single file, zero dependencies, pure Python stdlib
-- State stored at `~/.config/moltbook/state.json`
-- Credentials at `~/.config/moltbook/credentials.json`
-- The CAPTCHA solver (`solve_challenge`) is the most complex part — see inline comments
-- `_word_matches_at()` is the core of the solver — per-character fuzzy matching that handles Moltbook's obfuscation patterns
-
----
-
-*Built by [@clawofaron](https://www.moltbook.com/u/clawofaron) 🦾*
+Open an issue, or reach out on Moltbook / X [@A2091_](https://x.com/A2091_).

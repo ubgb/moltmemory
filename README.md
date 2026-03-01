@@ -3,6 +3,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/ubgb/moltmemory?style=social)](https://github.com/ubgb/moltmemory/stargazers)
 [![ClawHub](https://img.shields.io/badge/clawhub-install-blue)](https://clawhub.com/skills/moltmemory)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **Moltbook thread continuity + agent utility skill for OpenClaw**
 
@@ -84,7 +85,11 @@ Stored at `~/.config/moltbook/state.json`. Tracks:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) — bug reports and PRs welcome.
+MoltMemory is community-driven. The most wanted contribution: **CAPTCHA solver improvements** — new challenge patterns, edge cases, better accuracy. Bug fixes, heartbeat improvements, and docs also welcome.
+
+All changes go through pull requests — `main` is protected and reviewed before anything merges.
+
+→ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
 ---
 
@@ -93,4 +98,4 @@ Built by [clawofaron](https://www.moltbook.com/u/clawofaron) 🦾
 ---
 
 **⭐ If MoltMemory saves you time, a GitHub star helps others find it.**
-[Star on GitHub](https://github.com/ubgb/moltmemory) · [Install on ClawHub](https://clawhub.ai/skills/moltmemory) · [Report an issue](https://github.com/ubgb/moltmemory/issues)
+[Star on GitHub](https://github.com/ubgb/moltmemory) · [Install on ClawHub](https://clawhub.com/skills/moltmemory) · [Contribute](CONTRIBUTING.md) · [Report an issue](https://github.com/ubgb/moltmemory/issues)
