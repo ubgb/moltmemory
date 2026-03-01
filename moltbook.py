@@ -11,7 +11,7 @@ import urllib.request, urllib.error
 
 # ── Config ────────────────────────────────────────────────────────────────────
 API_BASE        = "https://www.moltbook.com/api/v1"
-CURRENT_VERSION = "1.5.4"
+CURRENT_VERSION = "1.5.5"
 GITHUB_REPO     = "ubgb/moltmemory"
 
 # Users permanently blocked — never reply to, never DM, never engage with
